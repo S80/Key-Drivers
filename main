@@ -1,0 +1,133 @@
+## Aramark Workstyle -----------------------------------------------------------
+## Job #27-182086 Workstyle Analysis
+## Afton Coombs at Murphy Research
+## acoombs@murphyresearch.com
+## 8.26.18
+
+library(magrittr)
+library(ggplot2)
+library(xlsx)
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+source("/Users/aftoncoombs/Documents/Murphy Stats Library/getCols.R")
+source("/Users/aftoncoombs/Documents/Murphy Stats Library/getStubNames.R")
+source("/Users/aftoncoombs/Documents/Murphy Stats Library/removeCol.R")
+source("/Users/aftoncoombs/Documents/Murphy Stats Library/getVarNames.R")
+source("/Users/aftoncoombs/Documents/Murphy Stats Library/recode.R")
+source("/Users/aftoncoombs/Documents/Murphy Stats Library/reorderCol.R")
+source("/Users/aftoncoombs/Documents/Murphy Stats Library/plotKeyDriverVars.R")
+source("/Users/aftoncoombs/Documents/Murphy Stats Library/runDrivers.R")
+source("/Users/aftoncoombs/Documents/Murphy Stats Library/formatDriversForWriting.R")
+## Note: update your path to these files
+
+
+################################################################################
+## BACKGROUND ------------------------------------------------------------------
+################################################################################
+## Three analyses:
+# 1.         Job Component Drivers of Satisfaction
+# Â·           IV: Highly satisfied with work environment (Q6=5)
+# Â·           DV: Current job component performance (Q8)
+# 2.         Environment Drivers of Satisfaction
+# Â·           IV: Highly satisfied with work environment (Q6=5)
+# Â·           DV: Current job work environment performance (Q11)
+# 3.         Amenity Drivers of Satisfaction
+# Â·           IV: Highly satisfied with work environment (Q6=5)
+# Â·           DV: Current job amenities performance (Q18)
+
+## Variables
+fileNameToWrite <- "Aramark Workstyle Key Drivers 27-182086 8.26.18.xlsx"
+explore <- TRUE
+respQLabel <- "q6"
+predQLabels <- list(
+        jobCompTotal = "q8",
+        workEnv = "q11",
+        amenity = "q18")
+predNumType <- "r"
+totalNumPreds <- list(
+        jobComp = 9,
+        workEnv = 16,
+        amenity =11)
+modType <- "binomial"
+topBoxVal <- 5
+## Note: the variables which have one value (e.g. modType <- binomial)
+## can be that way because all of the analyses are the same. Shortcut!
+## If each analysis were different, you would need a list of three items, e.g.:
+# modType <- list(
+#         jobComp = "binomial",
+#         workEvn = "binomial",
+#         amenity = "binomial"
+# )
+
+
+################################################################################
+## SETUP -----------------------------------------------------------------------
+################################################################################
+## Get data
+dataset <- read.csv("data/Final Data 8.8.18.csv",
+                    stringsAsFactors = FALSE)
+predLabels <- read.csv("data/predLabels.csv",
+                       stringsAsFactors = FALSE)
+
+## Get column headers
+## Munging survey row numbering to get dataset column labels
+numPreds <- lapply(totalNumPreds, function(x){
+        x <- seq(1, x)
+        })
+predRowNames <- lapply(numPreds, function(x){
+        paste0(predNumType, x)
+})
+predVarNames <- list()
+for (idx in 1:length(predRowNames)){
+        predVarNames[[idx]] <- paste0(predQLabels[[idx]], 
+                                      rep(predRowNames[[idx]], length(predQLabels[[idx]])))
+}
+names(predVarNames) <- names(predRowNames)
+varNames <- lapply(predVarNames, function(x){
+        x <- c(x, respQLabel)
+})
+
+vars <- lapply(varNames, getCols, dataset = dataset)
+
+
+################################################################################
+## RECODING --------------------------------------------------------------------
+################################################################################
+for (each in vars){
+        table(each$q6)
+}
+vars <- lapply(vars, reorderCol, keyVar = respQLabel) %>%
+        lapply(codeBinary, qualVals = topBoxVal)
+## Check to make sure coding binary worked
+for (each in vars){
+        table(each$q6)
+}
+
+
+################################################################################
+## EXPLORATION -----------------------------------------------------------------
+################################################################################
+if (explore){
+        lapply(vars, plotKeyDriverVars)
+}
+for (each in vars){
+        print(nrow(each[complete.cases(each), ]))
+}
+
+
+################################################################################
+## DRIVERS ---------------------------------------------------------------------
+################################################################################
+drivers <- lapply(vars, runDrivers, family = modType) %>%
+        lapply(formatDriversForWriting, predLabels = predLabels)
+
+
+################################################################################
+## WRITING TO FILE -------------------------------------------------------------
+################################################################################
+for (idx in 1:length(drivers)){
+        write.xlsx(drivers[[idx]],
+                   file = fileNameToWrite,
+                   sheetName = names(drivers)[idx],
+                   append = TRUE,
+                   row.names = FALSE)
+}
